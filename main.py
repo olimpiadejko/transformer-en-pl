@@ -1,4 +1,9 @@
 import pandas as pd
+import torch
+import torch.nn as nn
+from self_attention import SelfAttention
+from multi_head_attention import MultiHeadAttention
+from positional_encoding import PositionalEncoding
 
 # =========================
 # 1. DANE TRENINGOWE
@@ -114,9 +119,6 @@ for sentence in padded_sentences:
 # =========================
 #  6. EMBEDDING
 
-import torch
-import torch.nn as nn
-
 # Zamieniamy listę na tensor PyTorch
 input_tensor = torch.tensor(padded_sentences)
 
@@ -148,72 +150,30 @@ print(embedded.shape)
 #wynik tu był tensor o wymiarach (liczba_zdań, max_length, embedding_dim) czyli (5, 3, 8) w naszym przypadku
 
 # =========================
-# TWORZENIE QUERY, KEY I VALUE
+# POSITIONAL ENCODING
 # =========================
 
-# Tworzymy 3 niezależne warstwy liniowe.
-# Każda będzie uczyć się innych wag.
-
-Wq = nn.Linear(8, 8)
-Wk = nn.Linear(8, 8)
-Wv = nn.Linear(8, 8)
-
-# Z embeddingów tworzymy:
-# Query (Q)
-# Key (K)
-# Value (V)
-
-Q = Wq(embedded)
-K = Wk(embedded)
-V = Wv(embedded)
-
-print("\nRozmiar Q:")
-print(Q.shape)
-
-print("\nRozmiar K:")
-print(K.shape)
-
-print("\nRozmiar V:")
-print(V.shape)
-
-# =========================
-# ATTENTION SCORES
-# =========================
-
-# Porównujemy Query z Key.
-# Dzięki temu model określa,
-# które słowa są ze sobą powiązane.
-
-scores = torch.matmul(
-    Q,
-    K.transpose(-2, -1)
+positional_encoding = PositionalEncoding(
+    embedding_dim=8
 )
 
-print("\nRozmiar scores:")
-print(scores.shape)
-
-# =========================
-# SOFTMAX
-# =========================
-
-attention_weights = torch.softmax(
-    scores,
-    dim=-1
+embedded = positional_encoding(
+    embedded
 )
 
-print("\nRozmiar attention_weights:")
-print(attention_weights.shape)
-
-print("\nPrzykładowe attention weights dla pierwszego zdania:")
-print(attention_weights[0])
+print("\nPo positional encoding:")
+print(embedded.shape)
 
 # =========================
-# ATTENTION OUTPUT
+# SELF ATTENTION
 # =========================
 
-attention_output = torch.matmul(
-    attention_weights,
-    V
+attention = MultiHeadAttention(
+    embedding_dim=8
+)
+
+attention_output = attention(
+    embedded
 )
 
 print("\nRozmiar attention_output:")
