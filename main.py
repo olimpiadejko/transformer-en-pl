@@ -4,6 +4,7 @@ import torch.nn as nn
 from self_attention import SelfAttention
 from multi_head_attention import MultiHeadAttention
 from positional_encoding import PositionalEncoding
+from translator_model import TranslatorModel
 
 # =========================
 # 1. DANE TRENINGOWE
@@ -33,7 +34,8 @@ df = pd.DataFrame(data)
 # 2. TWORZENIE SŁOWNIKA
 # =========================
 
-all_words = []
+eng_words = []
+pol_words = []
 
 # Przechodzimy po wszystkich zdaniach angielskich
 for sentence in df["english"]:
@@ -45,136 +47,143 @@ for sentence in df["english"]:
     for word in words:
 
         # Dodajemy słowo tylko jeśli jeszcze go nie ma
-        if word not in all_words:
-            all_words.append(word)
+        if word not in eng_words:
+            eng_words.append(word)
+
+#to samo PL
+for sentence in df["polish"]:
+    for word in sentence.split():
+        if word not in pol_words:
+            pol_words.append(word)
 
 # =========================
 # 3. PRZYPISYWANIE NUMERÓW
 # =========================
 
-word2idx = {
+eng_word2idx = {
     "<PAD>": 0
 }
 
-for index, word in enumerate(all_words):
+for index, word in enumerate(eng_words):
+    eng_word2idx[word] = index + 1      #+1 bo 0 jest zarezerwowane dla <PAD>
 
-    word2idx[word] = index + 1      #+1 bo 0 jest zarezerwowane dla <PAD>
+
+pol_word2idx = {"<PAD>": 0}
+
+for index, word in enumerate(pol_words):
+    pol_word2idx[word] = index + 1
+
+input_vocab_size = len(eng_word2idx)
+output_vocab_size = len(pol_word2idx)
 
 # =========================
 # 4. SŁOWNIK I ZAKODOWANE ZDANIA
-print("SŁOWNIK:\n")
+# =========================
 
-for word, idx in word2idx.items():
+print("SŁOWNIK ANGIELSKI:\n")
+for word, idx in eng_word2idx.items():
     print(word, "->", idx)
 
-print("\nZAKODOWANE ZDANIA:\n")
+print("\nSŁOWNIK POLSKI:\n")
+for word, idx in pol_word2idx.items():
+    print(word, "->", idx)
 
+print("\nZAKODOWANE ZDANIA ANGIELSKIE:\n")
 for sentence in df["english"]:
-
     encoded_sentence = []
-
     for word in sentence.split():
+        encoded_sentence.append(eng_word2idx[word])
+    print(sentence, "->", encoded_sentence)
 
-        encoded_sentence.append(word2idx[word])
-
+print("\nZAKODOWANE ZDANIA POLSKIE:\n")
+for sentence in df["polish"]:
+    encoded_sentence = []
+    for word in sentence.split():
+        encoded_sentence.append(pol_word2idx[word])
     print(sentence, "->", encoded_sentence)
 
 # =========================
 # 5. PADDING
+# =========================
 
 print("\nPADDING:\n")
 
-encoded_sentences = []
-
+# --- KODOWANIE I PADDING EN ---
+eng_encoded_sentences = []
 for sentence in df["english"]:
-
     encoded = []
-
     for word in sentence.split():
+        encoded.append(eng_word2idx[word])
+    eng_encoded_sentences.append(encoded)
 
-        encoded.append(word2idx[word])
+max_length_eng = max(len(sentence) for sentence in eng_encoded_sentences)
+print("Najdluzsze zdanie EN ma dlugosc:", max_length_eng)
 
-    encoded_sentences.append(encoded)
-
-max_length = max(len(sentence) for sentence in encoded_sentences)
-
-print("Najdluzsze zdanie ma dlugosc:", max_length)
-
-padded_sentences = []
-
-for sentence in encoded_sentences:
-
+eng_padded_sentences = []
+for sentence in eng_encoded_sentences:
     padded = sentence.copy()
-
-    while len(padded) < max_length:
+    while len(padded) < max_length_eng:
         padded.append(0)
+    eng_padded_sentences.append(padded)
 
-    padded_sentences.append(padded)
+# --- KODOWANIE I PADDING PL ---
+pol_encoded_sentences = []
+for sentence in df["polish"]:
+    encoded = []
+    for word in sentence.split():
+        encoded.append(pol_word2idx[word])
+    pol_encoded_sentences.append(encoded)
 
-print("\nPo paddingu:\n")
+max_length_pol = max(len(sentence) for sentence in pol_encoded_sentences)
+print("Najdluzsze zdanie PL ma dlugosc:", max_length_pol)
 
-for sentence in padded_sentences:
+pol_padded_sentences = []
+for sentence in pol_encoded_sentences:
+    padded = sentence.copy()
+    while len(padded) < max_length_pol:
+        padded.append(0)
+    pol_padded_sentences.append(padded)
+
+print("\nPo paddingu EN:\n")
+for sentence in eng_padded_sentences:
+    print(sentence)
+
+print("\nPo paddingu PL:\n")
+for sentence in pol_padded_sentences:
     print(sentence)
 
 # =========================
-#  6. EMBEDDING
+#  6. TENSORY
+# =========================
 
 # Zamieniamy listę na tensor PyTorch
-input_tensor = torch.tensor(padded_sentences)
+input_tensor = torch.tensor(eng_padded_sentences)
+target_tensor = torch.tensor(pol_padded_sentences)
 
-print("\nTensor wejściowy:")
+print("\nTensor wejściowy (EN):")
 print(input_tensor)
+print("\nTensor docelowy (PL):")
+print(target_tensor)
 
-# Liczba słów w słowniku
-vocab_size = len(word2idx)
 
-# Rozmiar embeddingu
+
+# =========================
+# 7. INICJALIZACJA MODELU
+# =========================
+
 embedding_dim = 8
 
-# Tworzymy warstwę embeddingu np 1 -> [... 8 liczb ...] dla każdego słowa w słowniku 
-embedding = nn.Embedding(
-    num_embeddings=vocab_size,
-    embedding_dim=embedding_dim
+model = TranslatorModel(
+    input_vocab_size=input_vocab_size,
+    output_vocab_size=output_vocab_size,
+    embedding_dim=embedding_dim,
+    num_blocks=3
 )
 
-# Przekazujemy tensor wejściowy przez warstwę embeddingu i otrzymujemy tensor wyjściowy, gdzie każde słowo jest reprezentowane przez wektor o rozmiarze embedding_dim
-#czyli zamiana identyfikatory słów na wektory liczb rzeczywistych
-embedded = embedding(input_tensor)
+# Testowy przepływ danych
+model.eval()
+with torch.no_grad():
+    output = model(input_tensor)
 
-print("\nPo embeddingu:")
-print(embedded)
-
-print("\nRozmiar:")
-print(embedded.shape)
-
-#wynik tu był tensor o wymiarach (liczba_zdań, max_length, embedding_dim) czyli (5, 3, 8) w naszym przypadku
-
-# =========================
-# POSITIONAL ENCODING
-# =========================
-
-positional_encoding = PositionalEncoding(
-    embedding_dim=8
-)
-
-embedded = positional_encoding(
-    embedded
-)
-
-print("\nPo positional encoding:")
-print(embedded.shape)
-
-# =========================
-# SELF ATTENTION
-# =========================
-
-attention = MultiHeadAttention(
-    embedding_dim=8
-)
-
-attention_output = attention(
-    embedded
-)
-
-print("\nRozmiar attention_output:")
-print(attention_output.shape)
+print("\nRozmiar wyjścia z modelu:")
+print(output.shape) # Spodziewany wynik: [5, 3, 10]
