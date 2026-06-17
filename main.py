@@ -2,6 +2,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
 from self_attention import SelfAttention
 from multi_head_attention import MultiHeadAttention
 from positional_encoding import PositionalEncoding
@@ -35,7 +36,30 @@ data = {
         "you are good",
         "it is good",
         "i am here",
-        "you are here"
+        "you are here",
+        "cats are here",
+        "dogs are here",
+        "cats are good",
+        "dogs are good",
+        "i love you",
+        "cats love you",
+        "dogs love you",
+        "hello cats",
+        "hello dogs",
+        "good cats",
+        "good dogs",
+        "cats are dogs",
+        "dogs are cats",
+        "you love me",
+        "cats love cats",
+        "dogs love dogs",
+        "thank you cats",
+        "thank you dogs",
+        "hello you",
+        "it is here",
+        "it is cats",
+        "it is dogs",
+        "it is you"
     ],
 
     "polish": [
@@ -60,7 +84,30 @@ data = {
         "jestes dobry",
         "to jest dobre",
         "jestem tutaj",
-        "jestes tutaj"
+        "jestes tutaj",
+        "koty sa tutaj",
+        "psy sa tutaj",
+        "koty sa dobre",
+        "psy sa dobre",
+        "kocham cie",
+        "koty kochaja cie",
+        "psy kochaja cie",
+        "czesc koty",
+        "czesc psy",
+        "dobre koty",
+        "dobre psy",
+        "koty sa psami",
+        "psy sa kotami",
+        "kochasz mnie",
+        "koty kochaja koty",
+        "psy kochaja psy",
+        "dziekuje koty",
+        "dziekuje psy",
+        "czesc tobie",
+        "to jest tutaj",
+        "to sa koty",
+        "to sa psy",
+        "to ty"
     ]
 }
 
@@ -228,6 +275,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.005)
 
 EPOCHS = 100
 
+losses = []
 print("\nRozpoczęcie treningu:")
 for epoch in range(EPOCHS):
     model.train() # Tryb treningowy
@@ -242,6 +290,7 @@ for epoch in range(EPOCHS):
     # output.view spłaszcza macierz do 2D: [ilość_słów, rozmiar_słownika]
     # target_tensor.view spłaszcza macierz docelową do 1D: [ilość_słów]
     loss = loss_fn(output.view(-1, output_vocab_size), target_tensor.view(-1))
+    losses.append(loss.item())
     
     # 4. Backward pass (propagacja wsteczna)
     loss.backward()
@@ -254,6 +303,56 @@ for epoch in range(EPOCHS):
         print(f"Epoka: {epoch + 1:3d} | Błąd (Loss): {loss.item():.4f}")
 
 
+# =========================
+# WYKRES LOSS
+# =========================
+
+plt.figure(figsize=(8,5))
+plt.plot(losses)
+
+plt.title("Przebieg uczenia modelu")
+plt.xlabel("Epoka")
+plt.ylabel("Loss")
+
+plt.grid(True)
+
+plt.show()
+
+# =========================
+# ACCURACY
+# =========================
+
+model.eval()
+
+with torch.no_grad():
+
+    predictions = model(input_tensor)
+
+    predicted_indices = torch.argmax(
+        predictions,
+        dim=-1
+    )
+
+    correct = 0
+    total = 0
+
+    for i in range(target_tensor.shape[0]):
+        for j in range(target_tensor.shape[1]):
+
+            target = target_tensor[i, j].item()
+
+            if target != 0:
+
+                total += 1
+
+                prediction = predicted_indices[i, j].item()
+
+                if prediction == target:
+                    correct += 1
+
+accuracy = 100 * correct / total
+
+print(f"\nAccuracy: {accuracy:.2f}%")
 
 # =========================
 # 9. GENEROWANIE TŁUMACZENIA (INFERENCE)
