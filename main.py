@@ -11,7 +11,7 @@ from translator_model import TranslatorModel
 
 def main():
     # wczytanie datasetu
-    df = pd.read_csv("dataset2.csv")
+    df = pd.read_csv("dataset.csv")
     eng_word2idx, pol_word2idx = build_vocab(df)
 
     # Podział na zbiór treningowy (80%) i testowy (20%)
@@ -46,7 +46,7 @@ def main():
     )
 
     #trening
-    EPOCHS = 300
+    EPOCHS = 100
     losses = train_loop(model, EPOCHS, train_input_tensor, train_target_tensor, output_vocab_size)
 
     #wykres loss
